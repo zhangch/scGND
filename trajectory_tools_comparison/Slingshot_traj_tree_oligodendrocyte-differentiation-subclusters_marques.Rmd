@@ -1,0 +1,158 @@
+---
+title: "Slingshot Trajectory whith Data oligodendrocyte-differentiation-subclusters_marques
+"
+author: "ycliu"
+date: "09/27/2023"
+output:
+  html_notebook
+---
+
+
+```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Markdown parameters
+set_echo = FALSE
+set_eval = FALSE
+```
+
+```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Function to set markdown text color
+colorize <- function(x, color) {
+  if (knitr::is_latex_output()) {
+    sprintf("\\textcolor{%s}{%s}", color, x)
+  } else if (knitr::is_html_output()) {
+    sprintf("<span style='color: %s;'>%s</span>", color,
+      x)
+  } else x
+}
+```
+
+
+```{r, include=FALSE}
+# Set height of chunk output
+options(width = 60)
+local({
+  hook_output <- knitr::knit_hooks$get('output')
+  knitr::knit_hooks$set(output = function(x, options) {
+    if (!is.null(options$max.height)) options$attr.output <- c(
+      options$attr.output,
+      sprintf('style="max-height: %s;"', options$max.height)
+    )
+    hook_output(x, options)
+  })
+})
+```
+
+```{r, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
+# Load packages
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(ggplot2)
+library(cowplot)
+library(rmarkdown)
+library(readr)
+library(slingshot)
+```
+
+
+
+
+
+```{r, echo=FALSE}
+
+expression_data <- read.csv("/projectnb/czproj/Algorithms/ycliu/traj_data_real/oligodendrocyte-differentiation-subclusters_marques_count.csv", row.names = 1, header = TRUE)
+
+expression_data <- as.data.frame(t(expression_data))
+
+seurat_obj <- CreateSeuratObject(counts = expression_data)
+
+```
+
+```{r, echo=FALSE}
+seurat_obj <- NormalizeData(seurat_obj, normalization.method = "LogNormalize", scale.factor = 10000)
+seurat_obj <- FindVariableFeatures(seurat_obj, selection.method = "vst", nfeatures = 2000)
+seurat_obj <- ScaleData(seurat_obj, verbose = FALSE)
+
+# dimension reduction
+seurat_obj <- RunPCA(seurat_obj, npcs = 50, verbose = FALSE)
+seurat_obj <- RunUMAP(seurat_obj, reduction = "pca", dims = 1:50)
+
+seurat_obj <- FindNeighbors(seurat_obj, k.param = 100, reduction = "pca", dims = 1:50)
+seurat_obj <- FindClusters(seurat_obj, resolution = 0.3, algorithm=1)
+
+```
+
+
+
+```{r, echo=FALSE}
+
+cluster_labels <- read.csv("/projectnb/czproj/Algorithms/ycliu/traj_data_real/oligodendrocyte-differentiation-subclusters_marques_clusters.csv", header = TRUE)
+
+seurat_obj@meta.data$seurat_clusters = cluster_labels$x
+
+numeric_labels <- as.numeric(as.factor(seurat_obj@meta.data$seurat_clusters))
+
+seurat_obj@active.ident = as.factor(numeric_labels)
+
+DimPlot(seurat_obj, reduction = "umap", group.by= 'seurat_clusters' ) 
+
+DimPlot(seurat_obj, reduction = "umap") 
+
+
+```
+# `r colorize('Trajectory without start cluster', 'blue')` 
+
+```{r, echo=FALSE}
+
+sce <- as.SingleCellExperiment(seurat_obj)
+
+rd <- reducedDims(sce)$UMAP
+clusters <- colData(sce)$seurat_clusters
+
+# Convert to factor and then to numeric
+numeric_labels <- as.numeric(as.factor(clusters))
+
+# Create a SlingshotDataSet
+sds <- slingshot(rd, clusterLabels = numeric_labels)
+
+# Perform trajectory inference
+sds <- getLineages(sds)
+sds <- getCurves(sds)
+
+# Plot the results
+plot(reducedDims(sce)$UMAP, col = numeric_labels, pch = 16, asp = 1)
+lines(SlingshotDataSet(sds), lwd = 2)
+
+```
+
+
+```{r, echo=FALSE}
+sds@metadata$lineages
+
+
+```
+
+# `r colorize('Trajectory with start cluster', 'blue')`
+
+```{r, echo=FALSE}
+# Perform trajectory inference
+sds <- getLineages(sds, start.clus='12')
+sds <- getCurves(sds)
+
+# Plot the results
+plot(reducedDims(sce)$UMAP, col = numeric_labels, pch = 16, asp = 1)
+lines(SlingshotDataSet(sds), lwd = 2)
+
+```
+
+
+```{r, echo=FALSE}
+sds@metadata$lineages
+
+
+```
+
+
+
+
+

@@ -1,0 +1,115 @@
+---
+title: "Trajectory-Monocle3"
+author: "Jou_Hsuan"
+date: "2023-10-03"
+output: html_document
+---
+
+set up
+install: https://cole-trapnell-lab.github.io/monocle3/docs/installation/
+```{r}
+library(Seurat)
+library(monocle3)
+library(cowplot)
+library(tidyverse)
+library(SeuratWrappers)
+library(patchwork)
+```
+
+## functions
+
+```{r}
+cds_plots <- function(cds){
+  p1 <- plot_cells(cds, color_cells_by = "partition")
+  p2 <- plot_cells(cds,
+           color_cells_by = "cell_type",
+           label_cell_groups=FALSE,
+           label_leaves=TRUE,
+           label_branch_points=TRUE,
+           graph_label_size=1.5)
+  print(plot_grid(p1, p2, rel_widths = c(2,3)))
+}
+
+cds_timesVScell_type <- function(cds){
+  
+  p1 <- plot_cells(cds,
+           color_cells_by = "cell_type",
+           label_cell_groups=FALSE,
+           label_leaves=TRUE,
+           label_branch_points=TRUE,
+           graph_label_size=1.5)
+  p2 <- plot_cells(cds,
+           color_cells_by = "pseudotime",
+           label_cell_groups=FALSE,
+           label_leaves=FALSE,
+           label_branch_points=TRUE,
+           graph_label_size=1.5)
+  print(plot_grid(p1, p2, rel_widths = c(3,2)))
+}
+```
+
+
+## planaria
+```{r}
+plan_seurat <- readRDS('plan_seurat.rds') 
+plan_cds <- as.cell_data_set(plan_seurat)
+```
+```{r}
+plan_cds <- cluster_cells(plan_cds, resolution=1e-3)
+```
+
+```{r}
+p1 <- plot_cells(plan_cds, color_cells_by = "cluster", show_trajectory_graph = FALSE)
+p2 <- plot_cells(plan_cds, color_cells_by = "partition", show_trajectory_graph = FALSE)
+plot_grid(p1, p2)
+```
+```{r}
+cds_plots(plan_cds)
+```
+
+```{r}
+View(plan_data$traj)
+# last Step: Order cells
+plan_cds <- learn_graph(plan_cds)
+
+plan_cds <- order_cells(plan_cds)
+cds_timesVScell_type(plan_cds)
+```
+```{r}
+plan_results_seu <- data.frame(from=c('neoblast 1','neoblast 1','neoblast 1','epidermal neoblasts',
+                                  'early epidermal progenitors', 'late epidermal progenitors 1',
+                                  'late epidermal progenitors 2','parenchymal progenitors',
+                                  'ldlrr-1+ parenchymal cells', 'muscle progenitors', 'muscle body') , 
+                           to=c('epidermal neoblasts','parenchymal progenitors','muscle progenitors', 
+                                'early epidermal progenitors','late epidermal progenitors 1',
+                                'late epidermal progenitors 2','epidermis','ldlrr-1+ parenchymal cells',
+                                'pigment','muscle body', 'muscle pharynx'), 
+                           direction=c(TRUE))
+write.csv(plan_results_seu, 'planaria_seu_traj_result.csv')
+```
+
+
+## oligodendrocyte
+```{r}
+oligo_seurat <- readRDS('oligo_seurat.rds') 
+oligo_cds <- as.cell_data_set(oligo_seurat)
+```
+```{r}
+oligo_cds <- cluster_cells(oligo_cds, resolution=1e-3)
+cds_plots(oligo_cds)
+```
+
+```{r}
+View(oligo_data$traj)
+oligo_cds <- learn_graph(oligo_cds)
+# last Step: Order cells
+oligo_cds <- order_cells(oligo_cds)
+cds_timesVScell_type(oligo_cds)
+```
+
+```{r}
+oligo_result_seu <- data.frame(from=c('OPC', 'COP','NFOL1','NFOL2','MFOL1','MFOL2','MFOL2','MOL5','MOL5','MOL4','MOL3'),
+                           to=c('COP','NFOL1','NFOL2','MFOL1','MFOL2','MOL1','MOL5','MOL6','MOL4','MOL3','MOL2'),
+                           direction=c(TRUE))
+write.csv(oligo_result_seu, 'oligodendrocyte_seu_traj_result.csv')
+```

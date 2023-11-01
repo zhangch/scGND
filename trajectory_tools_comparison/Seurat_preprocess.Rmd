@@ -1,0 +1,102 @@
+---
+title: "Trajectory-Seurat"
+author: "Jou_Hsuan"
+date: "2023-10-09"
+output: html_document
+---
+
+set up
+```{r}
+library(cowplot)
+library(tidyverse)
+library(Seurat)
+```
+
+functions
+```{r}
+# read in data
+read_data <- function(folder_name){
+  files <- list.files(paste0('/projectnb/czlab/A00/ycliu/traj_data/',folder_name), full.names = TRUE)
+  files <- sort(files)
+  data_ <- lapply(files, FUN = read.csv,  row.names = 1)
+  names <- str_split(files,'_')
+  for(i in 1:length(names)){
+    names(data_)[[i]] <- str_split(names[[i]][4], '.csv')[[1]][1]
+  }
+  return(data_)
+}
+
+# make the data into correct input format
+correct_format <- function(data){
+  data[['count']] <-  data[['count']] %>% rownames_to_column(var = 'cells') %>% pivot_longer(cols = -c('cells') ,names_to = 'Genes', values_to = 'counts') %>% pivot_wider(names_from = 'cells', values_from = 'counts') %>% column_to_rownames(var = 'Genes') %>% as.matrix()
+
+  data[['gene_ann']] <- data.frame(row.names = rownames(data[['count']]), id=rownames(data[['count']]))
+  names(data)[names(data)=='clusters'] <- 'cell_type'
+  return(data)
+}
+```
+
+
+planaria
+```{r}
+plan_data <- read_data('planaria')
+plan_data <- correct_format(plan_data)
+plan_seurat <- CreateSeuratObject(counts = plan_data[['count']], project = "plan")
+plan_seurat@meta.data$cell_type <- plan_data$cell_type$x
+VlnPlot(plan_seurat, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
+FeatureScatter(plan_seurat, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+```
+
+preprocess
+```{r} 
+plan_seurat <- subset(plan_seurat, subset = (nCount_RNA < 4000 & nCount_RNA > 3 )) 
+plan_seurat <- plan_seurat %>% NormalizeData(verbose = FALSE) %>% FindVariableFeatures(verbose = FALSE) %>% ScaleData() %>% RunPCA() %>% FindNeighbors()  %>% FindClusters() %>% RunUMAP(dims = 1:20)
+DimPlot(plan_seurat, group.by = c("cell_type", "ident"), reduction = 'umap')
+```
+
+```{r}
+plan_seurat <- RenameIdents(plan_seurat, 
+                            '0' = 'neoblast 1',
+                            '1' = 'neoblast 1',
+                            '3' = 'neoblast 1',
+                            '9' = 'neoblast 1',
+                            '2' = 'early epidermal progenitors',
+                            '5' = 'early epidermal progenitors',
+                            '13' = 'epidermis',
+                            '8' = 'late epidermal progenitors 1 & 2',
+                            '4' = 'muscle body',
+                            '7' = 'muscle progenitors',
+                            '6' = 'parenchymal progenitors & ldlrr-1+ parenchymal cells',
+                            '11' = 'pigment',
+                            '10' = 'psap+ parenchymal cells',
+                            '12' = 'aqp+ parenchymal cells',
+                            '14' = 'muscle pharynx'
+                            )
+
+DimPlot(plan_seurat, group.by = c("ident"), reduction = 'umap')
+```
+
+```{r}
+saveRDS(plan_seurat, 'plan_seurat.rds')
+```
+
+## oligodendrocyte
+```{r}
+oligo_data <- read_data('oligodendrocyte') 
+oligo_data <- correct_format(oligo_data)
+oligo_seurat <- CreateSeuratObject(counts = oligo_data[['count']], project = "oligo")
+oligo_seurat@meta.data$cell_type <- oligo_data$cell_type$x
+VlnPlot(oligo_seurat, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
+FeatureScatter(oligo_seurat, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+```
+preprocess
+```{r} 
+oligo_seurat <- subset(oligo_seurat, subset = (nCount_RNA < 15000 & nCount_RNA > 3  & nFeature_RNA > 200)) 
+
+oligo_seurat <- oligo_seurat %>% NormalizeData(verbose = FALSE) %>% FindVariableFeatures(verbose = FALSE) %>% ScaleData() %>% RunPCA() %>% FindNeighbors()  %>% FindClusters() %>% RunUMAP(dims = 1:20)
+DimPlot(oligo_seurat, group.by = c("cell_type", "ident"), reduction = 'umap')
+```
+
+```{r}
+saveRDS(oligo_seurat, 'oligo_seurat.rds')
+```

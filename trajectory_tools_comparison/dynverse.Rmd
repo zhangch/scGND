@@ -1,0 +1,185 @@
+---
+title: "mst - Seurat"
+author: "Jou_Hsuan"
+date: "2023-10-09"
+output: html_document
+---
+
+# install package
+```{r}
+devtools::install_github("dynverse/dyno")
+```
+
+# set up
+```{r}
+library(dyno)
+library(tidyverse)
+library(Seurat)
+library(cowplot)
+```
+
+```{r}
+plan_seu <- readRDS('plan_seurat.rds')
+plan_dyo <- wrap_expression(
+  counts = Matrix::t(as(as.matrix(plan_seu@assays$RNA@counts), 'sparseMatrix')),
+  expression = Matrix::t(as(as.matrix(plan_seu@assays$RNA@data), 'sparseMatrix'))
+)
+```
+
+```{r}
+#add cluster info “seurat_clusters
+plan_dyo <- add_grouping(
+   plan_dyo,
+   plan_seu$cell_type
+)
+
+plan_dyo <- add_dimred(
+  plan_dyo,
+  plan_seu@reductions$umap@cell.embeddings
+)
+
+plan_dyo <- add_prior_information(
+  plan_dyo,
+  start_id = "plan1_CTACATTCCAAA"
+)
+```
+
+```{r}
+set.seed(1)
+#plan_celltree <- infer_trajectory(plan_dyo, method = ti_celltree_maptpx(),
+#                                  give_priors = c("start_id"), mc_cores = 8
+#                               )
+#plan_slice <- infer_trajectory(plan_dyo, method = ti_slice(),
+#                                  give_priors = c("start_id"), mc_cores = 8
+#                               )
+plan_mst <- infer_trajectory(plan_dyo, method = ti_mst(),
+                                  give_priors = c("start_id"), mc_cores = 8
+                               )
+#plan_paga <- infer_trajectory(plan_dyo, method = ti_paga_tree(),
+#                                  give_priors = c("start_id"), mc_cores = 8
+#                               )
+#plan_slingshot <- infer_trajectory(plan_dyo, method = ti_slingshot(),
+#                                  give_priors = c("start_id"), mc_cores = 8
+#                               )
+
+```
+
+
+```{r}
+p1 <- plot_dimred(plan_mst, 
+            expression_source = plan_dyo$expression, 
+            grouping = plan_dyo$grouping, 
+            size_cells = 0.1, arrow = grid::arrow(type = "closed", length = unit(0.01, "inches")))
+p2 <- plot_dimred(plan_mst, grouping = group_onto_nearest_milestones(plan_mst))
+p3 <- plot_dimred(plan_mst, color_cells = "pseudotime")
+plot_grid(p2, p3)
+plot_grid(p1)
+```
+
+```{r}
+plan_results_mst <- data.frame(from=c('neoblast 1','neoblast 1','neoblast 1','epidermal neoblasts',
+                                  'early epidermal progenitors', 'late epidermal progenitors 1',
+                                  'pigment','muscle progenitors','muscle pharynx'
+                                  ) , 
+                           to=c('epidermal neoblasts','parenchymal progenitors','pigment', 
+                                'early epidermal progenitors','late epidermal progenitors 1',
+                                'late epidermal progenitors 2', 'muscle progenitors', 'muscle pharynx', 'muscle body'), 
+                           direction=c(TRUE))
+write.csv(plan_results_mst, 'planaria_mst_traj_result.csv')
+```
+
+
+
+
+```{r}
+plan_mst$milestone_network
+```
+```{r}
+saveRDS(plan_mst, 'plan_mst.rds')
+saveRDS(plan_dyo, 'plan_dyo.rds')
+```
+
+
+```{r}
+DimPlot(plan_seu, cells.highlight = 'plan1_CTACATTCCAAA')
+plan_mst <- dynwrap::add_root(plan_mst, root_cell_id = 'plan1_CTACATTCCAAA')
+```
+
+
+
+```{r}
+oligo_seu <- readRDS('oligo_seurat.rds')
+oligo_dyo <- wrap_expression(
+  counts = Matrix::t(as(as.matrix(oligo_seu@assays$RNA@counts), 'sparseMatrix')),
+  expression = Matrix::t(as(as.matrix(oligo_seu@assays$RNA@data), 'sparseMatrix'))
+)
+```
+
+```{r}
+#add cluster info “seurat_clusters
+oligo_dyo <- add_grouping(
+   oligo_dyo,
+   oligo_seu$cell_type
+)
+
+oligo_dyo <- add_dimred(
+  oligo_dyo,
+  oligo_seu@reductions$umap@cell.embeddings
+)
+
+oligo_dyo <- add_prior_information(
+  oligo_dyo,
+  start_id = "C1-1771017-028-D03"
+)
+```
+
+```{r}
+set.seed(1)
+#plan_celltree <- infer_trajectory(plan_dyo, method = ti_celltree_maptpx(),
+#                                  give_priors = c("start_id"), mc_cores = 8
+#                               )
+#plan_slice <- infer_trajectory(plan_dyo, method = ti_slice(),
+#                                  give_priors = c("start_id"), mc_cores = 8
+#                               )
+oligo_mst <- infer_trajectory(oligo_dyo, method = ti_mst(),
+                                  give_priors = c("start_id"), mc_cores = 8
+                               )
+#plan_paga <- infer_trajectory(plan_dyo, method = ti_paga_tree(),
+#                                  give_priors = c("start_id"), mc_cores = 8
+#                               )
+#plan_slingshot <- infer_trajectory(plan_dyo, method = ti_slingshot(),
+#                                  give_priors = c("start_id"), mc_cores = 8
+#                               )
+
+```
+
+```{r}
+oligo_mst <- dynwrap::add_root(oligo_mst, root_cell_id = 'C1-1771017-028-D03')
+p4 <- plot_dimred(oligo_mst, 
+            expression_source = oligo_dyo$expression, 
+            grouping = oligo_dyo$grouping
+            )
+p5 <- plot_dimred(oligo_mst, grouping = group_onto_nearest_milestones(oligo_mst))
+p6 <- plot_dimred(oligo_mst, color_cells = "pseudotime")
+plot_grid(p5, p6)
+plot_grid(p4)
+```
+
+```{r}
+oligo_mst$milestone_network
+```
+
+```{r}
+saveRDS(plan_mst, 'oligo_mst.rds')
+saveRDS(plan_dyo, 'oligo_dyo.rds')
+```
+
+```{r}
+oligo_result_mst <- data.frame(from=c('OPC', 'COP','NFOL1','NFOL2','MFOL1','MFOL2','MOL1','MOL2','MOL3','MOL4','MOL5'
+                                      ),
+                           to=c('COP','NFOL1','NFOL2','MFOL1','MFOL2','MOL1','MOL2','MOL3','MOL4','MOL5','MOL6'
+                                ),
+                           direction=c(TRUE))
+write.csv(oligo_result_mst, 'oligodendrocyte_mst_traj_result.csv')
+```
+

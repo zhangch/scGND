@@ -1,0 +1,128 @@
+---
+title: "Trajectory-Monocle3"
+author: "Jou_Hsuan"
+date: "2023-10-03"
+output: html_document
+---
+
+set up
+install: https://cole-trapnell-lab.github.io/monocle3/docs/installation/
+```{r}
+#library(BiocManager)
+#library(devtools)
+#devtools::install_github('cole-trapnell-lab/monocle3')
+library(monocle3)
+library(cowplot)
+library(tidyverse)
+```
+
+## functions
+
+```{r}
+# read in data
+read_data <- function(folder_name){
+  files <- list.files(paste0('/projectnb/czlab/A00/ycliu/traj_data/',folder_name), full.names = TRUE)
+  files <- sort(files)
+  data_ <- lapply(files, FUN = read.csv,  row.names = 1)
+  names <- str_split(files,'_')
+  for(i in 1:length(names)){
+    names(data_)[[i]] <- str_split(names[[i]][4], '.csv')[[1]][1]
+  }
+  return(data_)
+}
+
+# make the data into correct input format
+correct_format <- function(data){
+  data[['count']] <-  data[['count']] %>% rownames_to_column(var = 'cells') %>% pivot_longer(cols = -c('cells') ,names_to = 'Genes', values_to = 'counts') %>% pivot_wider(names_from = 'cells', values_from = 'counts') %>% column_to_rownames(var = 'Genes') %>% as.matrix()
+
+  data[['gene_ann']] <- data.frame(row.names = rownames(data[['count']]), id=rownames(data[['count']]))
+  names(data)[names(data)=='clusters'] <- 'cell_type'
+  return(data)
+}
+
+#Generate a cell_data_set and preprocess data
+
+to_cds_process <- function(data){
+  cds <- new_cell_data_set(data[['count']],
+                         cell_metadata = data[['cell_type']],
+                         gene_metadata = data[['gene_ann']])
+  cds <- preprocess_cds(cds, num_dim = 20) %>% reduce_dimension() %>% cluster_cells() %>% learn_graph()
+  print(plot_pc_variance_explained(cds))
+  return(cds)
+}
+
+
+
+cds_plots <- function(cds){
+  p1 <- plot_cells(cds, color_cells_by = "partition")
+  p2 <- plot_cells(cds,
+           color_cells_by = "x",
+           label_cell_groups=FALSE,
+           label_leaves=TRUE,
+           label_branch_points=TRUE,
+           graph_label_size=1.5)
+  print(plot_grid(p1, p2, rel_widths = c(2,3)))
+}
+
+cds_timesVScell_type <- function(cds){
+  
+  p1 <- plot_cells(cds,
+           color_cells_by = "x",
+           label_cell_groups=FALSE,
+           label_leaves=TRUE,
+           label_branch_points=TRUE,
+           graph_label_size=1.5)
+  p2 <- plot_cells(cds,
+           color_cells_by = "pseudotime",
+           label_cell_groups=FALSE,
+           label_leaves=FALSE,
+           label_branch_points=TRUE,
+           graph_label_size=1.5)
+  print(plot_grid(p1, p2, rel_widths = c(3,2)))
+}
+```
+
+
+## planaria
+```{r}
+plan_data <- read_data('planaria') 
+plan_data <- correct_format(plan_data)
+plan_cds <- to_cds_process(plan_data)
+cds_plots(plan_cds)
+```
+
+```{r}
+View(plan_data$traj)
+# last Step: Order cells
+plan_cds <- order_cells(plan_cds)
+cds_timesVScell_type(plan_cds)
+```
+```{r}
+plan_results <- data.frame(from=c('neoblast 1','neoblast 1','neoblast 1','epidermal neoblasts','late epidermal progenitors 1','parenchymal progenitors','ldlrr-1+ parenchymal cells','muscle progenitors','muscle body') , 
+                           to=c('epidermal neoblasts','parenchymal progenitors','muscle progenitors','late epidermal progenitors 1','late epidermal progenitors 2','ldlrr-1+ parenchymal cells','pigment','muscle body','muscle pharynx'), 
+                           direction=c(TRUE))
+write.csv(plan_results, 'planaria_traj_result.csv')
+```
+
+
+## oligodendrocyte
+```{r}
+oligo_data <- read_data('oligodendrocyte') 
+oligo_data <- correct_format(oligo_data)
+oligo_cds <- to_cds_process(oligo_data)
+cds_plots(oligo_cds)
+```
+
+```{r}
+View(oligo_data$traj)
+# last Step: Order cells
+oligo_cds <- order_cells(oligo_cds)
+cds_timesVScell_type(oligo_cds)
+```
+
+```{r}
+oligo_result <- data.frame(from=c('COP','NFOL1','NFOL2','MFOL1/MFOL2','MOL1'),
+                           to=c('NFOL1','NFOL2','MFOL1/MFOL2','MOL1','MOL2/MOL3/MOL4/MOL5'),
+                           direction=c(TRUE))
+write.csv(oligo_result, 'oligodendrocyte_traj_result.csv')
+```
