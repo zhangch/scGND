@@ -5,10 +5,10 @@ scGND(Single-cell Graph Neural Diffusion) is a physics-informed graph generative
 This repository contains the source code for the paper "scGND: Graph neural diffusion model enhances single-cell RNA-seq analysis", Yu-Chen Liu, Anqi Zou, Simon Liang Lu, Jou-Hsuan Lee, Juexin Wang*, and Chao Zhang*.
 
 # Installation:
-(```)
+```
 git clone https://github.com/zhangch/scGND.git
 cd scGND.git
-(```)
+```
 
 # Tutorials:
 
