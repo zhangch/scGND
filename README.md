@@ -7,7 +7,7 @@ This repository contains the source code for the paper "scGND: Graph neural diff
 # Installation:
 ```
 git clone https://github.com/zhangch/scGND.git
-cd scGND.git
+cd scGND
 ```
 
 # Tutorials:
